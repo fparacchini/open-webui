@@ -3,8 +3,8 @@
 # use build args in the docker build command with --build-arg="BUILDARG=true"
 ARG USE_CUDA=false
 ARG USE_OLLAMA=false
-ARG USE_SLIM=false
-ARG USE_PERMISSION_HARDENING=false
+ARG USE_SLIM=true
+ARG USE_PERMISSION_HARDENING=true
 # Tested with cu117 for CUDA 11 and cu121 for CUDA 12 (default)
 ARG USE_CUDA_VER=cu128
 # any sentence transformer model; models to use can be found at https://huggingface.co/models?library=sentence-transformers
@@ -42,7 +42,7 @@ ENV APP_BUILD_HASH=${BUILD_HASH}
 RUN npm run build
 
 ######## WebUI backend ########
-FROM python:3.11-slim-bookworm AS base
+FROM python:3.11-slim-trixie AS base
 
 # Use args
 ARG USE_CUDA
