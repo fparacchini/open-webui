@@ -698,6 +698,7 @@ async def lifespan(app: FastAPI):
     if hasattr(app.state, "redis_task_command_listener"):
         app.state.redis_task_command_listener.cancel()
 
+from open_webui.middleware.access_log import setup_access_logging
 
 app = FastAPI(
     title="Open WebUI",
@@ -706,6 +707,8 @@ app = FastAPI(
     redoc_url=None,
     lifespan=lifespan,
 )
+
+setup_access_logging(app)
 
 # For Open WebUI OIDC/OAuth2
 oauth_manager = OAuthManager(app)
@@ -2589,12 +2592,27 @@ async def serve_cache_file(
     path: str,
     user=Depends(get_verified_user),
 ):
-    file_path = os.path.abspath(os.path.join(CACHE_DIR, path))
-    # prevent path traversal
-    if not file_path.startswith(os.path.abspath(CACHE_DIR)):
+    from pathlib import Path
+
+    # Sanitize: reject any path containing traversal sequences or absolute paths
+    if ".." in path or path.startswith("/") or path.startswith("\\"):
+        raise HTTPException(status_code=400, detail="Invalid path")
+
+    # Use only the filename (last component) to prevent any directory traversal
+    safe_filename = Path(path).name
+    if not safe_filename or safe_filename in (".", ".."):
+        raise HTTPException(status_code=400, detail="Invalid path")
+
+    cache_dir = Path(CACHE_DIR).resolve()
+    file_path = (cache_dir / safe_filename).resolve()
+
+    # Verify the resolved path is strictly within CACHE_DIR
+    if cache_dir not in file_path.parents and file_path.parent != cache_dir:
         raise HTTPException(status_code=404, detail="File not found")
-    if not os.path.isfile(file_path):
+
+    if not file_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
+
     return FileResponse(file_path)
 
 

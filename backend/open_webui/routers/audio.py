@@ -1194,15 +1194,31 @@ def transcription(
         )
 
     try:
-        ext = file.filename.split(".")[-1]
+        from pathlib import Path
+        import re
+
+        # Sanitize extension: extract only alphanumeric characters to prevent path traversal
+        raw_ext = Path(file.filename).suffix.lstrip(".") if file.filename else ""
+        # Allow only safe characters in extension (alphanumeric)
+        ext = re.sub(r"[^a-zA-Z0-9]", "", raw_ext)
+        if not ext:
+            ext = "tmp"
+
         id = uuid.uuid4()
 
         filename = f"{id}.{ext}"
         contents = file.file.read()
 
-        file_dir = f"{CACHE_DIR}/audio/transcriptions"
-        os.makedirs(file_dir, exist_ok=True)
-        file_path = f"{file_dir}/{filename}"
+        file_dir = Path(CACHE_DIR) / "audio" / "transcriptions"
+        file_dir.mkdir(parents=True, exist_ok=True)
+        file_path = file_dir / filename
+
+        # Verify the resolved path is within the expected directory
+        if file_dir.resolve() not in file_path.resolve().parents and file_path.resolve().parent != file_dir.resolve():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid file path",
+            )
 
         with open(file_path, "wb") as f:
             f.write(contents)
