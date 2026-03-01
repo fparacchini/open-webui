@@ -1194,7 +1194,9 @@ def transcription(
         )
 
     try:
-        ext = file.filename.split(".")[-1]
+        safe_name = os.path.basename(file.filename) if file.filename else ""
+        ext = safe_name.rsplit(".", 1)[-1] if "." in safe_name else ""
+
         id = uuid.uuid4()
 
         filename = f"{id}.{ext}"
@@ -1210,6 +1212,10 @@ def transcription(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid file path",
             )
+
+        # Defense-in-depth: ensure resolved path stays within intended directory
+        if not os.path.realpath(file_path).startswith(os.path.realpath(file_dir)):
+            raise ValueError("Invalid file path detected")
 
         # Defense-in-depth: ensure resolved path stays within intended directory
         if not os.path.realpath(file_path).startswith(os.path.realpath(file_dir)):
